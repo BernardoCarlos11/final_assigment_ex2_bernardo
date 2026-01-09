@@ -17,13 +17,6 @@ Antes de executar o Terraform:
 Criação da infraestrutura
 A password da máquina virtual não está em nenhum ficheiro.
 
-Exemplo:
-
-$env:TF_VAR_admin_password="PASSWORD_DA_VM"
-terraform init
-terraform apply
-
-No final, o Terraform apresenta o IP público da máquina virtual.
 
 Ansible
 
