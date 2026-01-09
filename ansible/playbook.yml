@@ -1,0 +1,147 @@
+- name: Configure DHCP server and run local namespace test
+  hosts: dhcp
+  become: true
+
+  vars_files:
+    - vault.yml
+
+  vars:
+    # Rede de TESTE local (não depende do DHCP do Azure)
+    dhcp_subnet: "10.10.10.0"
+    dhcp_netmask: "255.255.255.0"
+    dhcp_range_start: "10.10.10.100"
+    dhcp_range_end: "10.10.10.150"
+    dhcp_router: "10.10.10.1"
+    dhcp_dns: "1.1.1.1"
+
+    bridge_name: "br-dhcp"
+    ns_name: "nsclient"
+    veth_host: "veth-host"
+    veth_ns: "veth-ns"
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - isc-dhcp-server
+          - isc-dhcp-client
+          - iproute2
+        state: present
+        update_cache: yes
+
+    - name: Configure DHCP scope
+      copy:
+        dest: /etc/dhcp/dhcpd.conf
+        mode: "0644"
+        content: |
+          default-lease-time 600;
+          max-lease-time 7200;
+          authoritative;
+
+          subnet {{ dhcp_subnet }} netmask {{ dhcp_netmask }} {
+            range {{ dhcp_range_start }} {{ dhcp_range_end }};
+            option routers {{ dhcp_router }};
+            option domain-name-servers {{ dhcp_dns }};
+          }
+
+    - name: Configure isc-dhcp-server to listen on veth host interface
+      copy:
+        dest: /etc/default/isc-dhcp-server
+        mode: "0644"
+        content: |
+          INTERFACESv4="{{ veth_host }}"
+          INTERFACESv6=""
+      notify: Restart DHCP
+
+    - name: Create bridge for local test network
+      shell: |
+        set -e
+        ip link add {{ bridge_name }} type bridge 2>/dev/null || true
+        ip addr add {{ dhcp_router }}/24 dev {{ bridge_name }} 2>/dev/null || true
+        ip link set {{ bridge_name }} up
+      args:
+        executable: /bin/bash
+
+    - name: Create veth pair and attach host end to bridge
+      shell: |
+        set -e
+        ip link add {{ veth_host }} type veth peer name {{ veth_ns }} 2>/dev/null || true
+        ip link set {{ veth_host }} master {{ bridge_name }} 2>/dev/null || true
+        ip link set {{ veth_host }} up
+      args:
+        executable: /bin/bash
+      notify: Restart DHCP
+
+    - name: Ensure DHCP service is running
+      service:
+        name: isc-dhcp-server
+        state: started
+        enabled: true
+
+    - name: Create namespace and move veth peer into it
+      shell: |
+        set -e
+        ip netns add {{ ns_name }} 2>/dev/null || true
+        ip link set {{ veth_ns }} netns {{ ns_name }} 2>/dev/null || true
+        ip netns exec {{ ns_name }} ip link set lo up
+        ip netns exec {{ ns_name }} ip link set {{ veth_ns }} up
+      args:
+        executable: /bin/bash
+
+    - name: Request DHCP lease inside namespace (test)
+      shell: |
+        set -e
+        ip netns exec {{ ns_name }} dhclient -v -1 {{ veth_ns }}
+        ip netns exec {{ ns_name }} ip -4 addr show dev {{ veth_ns }}
+      args:
+        executable: /bin/bash
+      register: dhclient_out
+
+    - name: Show DHCP client output
+      debug:
+        var: dhclient_out.stdout_lines
+
+    # --- ADICIONADO: Prova direta do IP + routing no namespace ---
+    - name: Show namespace interface IPv4 (proof)
+      shell: |
+        set -e
+        ip netns exec {{ ns_name }} ip -4 addr show dev {{ veth_ns }}
+        ip netns exec {{ ns_name }} ip -4 route
+      args:
+        executable: /bin/bash
+      register: ns_ip_out
+
+    - name: Print namespace IP and route
+      debug:
+        var: ns_ip_out.stdout_lines
+
+    # --- ADICIONADO: Prova via logs do serviço DHCP ---
+    - name: Show DHCP server logs (proof)
+      shell: |
+        set -e
+        journalctl -u isc-dhcp-server --no-pager -n 80 || true
+      args:
+        executable: /bin/bash
+      register: dhcp_logs_out
+
+    - name: Print DHCP logs
+      debug:
+        var: dhcp_logs_out.stdout_lines
+
+    - name: Show last leases (proof)
+      shell: |
+        set -e
+        tail -n 50 /var/lib/dhcp/dhcpd.leases || true
+      args:
+        executable: /bin/bash
+      register: leases_out
+
+    - name: Print leases
+      debug:
+        var: leases_out.stdout_lines
+
+  handlers:
+    - name: Restart DHCP
+      service:
+        name: isc-dhcp-server
+        state: restarted
