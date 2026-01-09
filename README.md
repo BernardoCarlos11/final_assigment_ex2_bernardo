@@ -55,4 +55,4 @@ Conclusão
 
 Este exercício demonstra a criação automática de infraestrutura em Azure com Terraform e a configuração de um servidor DHCP com Ansible, de forma segura e totalmente automatizada.
 
-NOTA: Durante o exercicio tive algumas dificuldades em conseguir utilizar o vault pois quando me tentada ligar ao azure por ssh ele não ia buscar a password ao vault, com ajuda do chatGPT consegui perceber que o problema estava relacionado com um espaço a mais te tinha no codigo dentro do vault.
+NOTA: Durante o exercicio tive algumas dificuldades em conseguir utilizar o vault pois quando me tentada ligar ao azure por ssh ele não ia buscar a password ao vault, com ajuda do chatGPT consegui perceber que o problema estava relacionado com um espaço a mais te tinha no codigo dentro do vault e o caminho para chegar ao vault não estava a ser encontrado, entãoa conselhou a adicionar uma setp "dhcp.yml" e resolveu o problema.
