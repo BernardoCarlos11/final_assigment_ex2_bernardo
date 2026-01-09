@@ -56,7 +56,7 @@ Segurança
 Não existem passwords em ficheiros Terraform ou Ansible
 As credenciais estão protegidas dentro Ansible Vault encriptado
 
-A password do Vault em nenhuma circunstancia real seria inserida aqui, porém para pode avaliar a password do vault é "P@sswOrd1234"
+A password do Vault em nenhuma circunstancia real seria inserida aqui, porém para pode avaliare testar, a password do vault é "P@sswOrd1234"
 
 Conclusão
 
