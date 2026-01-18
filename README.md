@@ -1,6 +1,8 @@
 # final_assigment_ex2_bernardo
 Exercicio 2
 
+Bernardo Carlos nºmec: 88206
+
 Objetivo
 Criar uma máquina virtual Linux em Microsoft Azure que funcione como servidor DHCP, utilizando Terraform e Ansible, sem configuração manual e sem passwords guardadas em scripts.
 
